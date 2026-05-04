@@ -118,10 +118,12 @@ class FakeIMAPArchiveFailure:
 
 
 class FakeSMTPSuccess:
-    def __init__(self, host, port):
+    def __init__(self, host, port, timeout=None):
         assert host == "smtp.gmail.com"
-        assert port == 465
+        assert port == 587
+        assert timeout == 12.0
         self.logged_in = False
+        self.tls_started = False
         self.sent_to = None
         self.sent_cc = None
         self.sent_subject = None
@@ -132,7 +134,16 @@ class FakeSMTPSuccess:
     def __exit__(self, exc_type, exc, tb):
         return False
 
+    def ehlo(self):
+        return 250, b"hello"
+
+    def starttls(self, context=None):
+        assert context is not None
+        self.tls_started = True
+        return 220, b"ready for tls"
+
     def login(self, username, app_password):
+        assert self.tls_started is True
         self.logged_in = True
         return 235, b"2.7.0 Accepted"
 
@@ -145,6 +156,11 @@ class FakeSMTPSuccess:
 class FakeSMTPFailure:
     def __init__(self, *_args, **_kwargs):
         raise RuntimeError("smtp unavailable")
+
+
+class FakeSMTPTimeout:
+    def __init__(self, *_args, **_kwargs):
+        raise TimeoutError("timed out")
 
 
 def test_get_latest_emails_missing_credentials(monkeypatch):
@@ -248,7 +264,7 @@ def test_send_email_missing_credentials(monkeypatch):
 def test_send_email_success(monkeypatch):
     monkeypatch.setenv("IMAP_USERNAME", "user@example.com")
     monkeypatch.setenv("IMAP_APP_PASSWORD", "app-password")
-    monkeypatch.setattr("imap_mcp.server.smtplib.SMTP_SSL", FakeSMTPSuccess)
+    monkeypatch.setattr("imap_mcp.server.smtplib.SMTP", FakeSMTPSuccess)
 
     result = send_email("to@example.com", "Subject", "Body")
 
@@ -258,7 +274,7 @@ def test_send_email_success(monkeypatch):
 def test_send_email_success_with_cc(monkeypatch):
     monkeypatch.setenv("IMAP_USERNAME", "user@example.com")
     monkeypatch.setenv("IMAP_APP_PASSWORD", "app-password")
-    monkeypatch.setattr("imap_mcp.server.smtplib.SMTP_SSL", FakeSMTPSuccess)
+    monkeypatch.setattr("imap_mcp.server.smtplib.SMTP", FakeSMTPSuccess)
 
     result = send_email("to@example.com", "Subject", "Body", cc="copy@example.com")
 
@@ -268,11 +284,21 @@ def test_send_email_success_with_cc(monkeypatch):
 def test_send_email_smtp_failure(monkeypatch):
     monkeypatch.setenv("IMAP_USERNAME", "user@example.com")
     monkeypatch.setenv("IMAP_APP_PASSWORD", "app-password")
-    monkeypatch.setattr("imap_mcp.server.smtplib.SMTP_SSL", FakeSMTPFailure)
+    monkeypatch.setattr("imap_mcp.server.smtplib.SMTP", FakeSMTPFailure)
 
     result = send_email("to@example.com", "Subject", "Body")
 
     assert result == "SMTP send failed: smtp unavailable"
+
+
+def test_send_email_smtp_timeout(monkeypatch):
+    monkeypatch.setenv("IMAP_USERNAME", "user@example.com")
+    monkeypatch.setenv("IMAP_APP_PASSWORD", "app-password")
+    monkeypatch.setattr("imap_mcp.server.smtplib.SMTP", FakeSMTPTimeout)
+
+    result = send_email("to@example.com", "Subject", "Body")
+
+    assert result == "SMTP send failed: timed out."
 
 
 def test_archive_email_missing_credentials(monkeypatch):

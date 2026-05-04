@@ -3,6 +3,8 @@ import os
 import imaplib
 import email
 import smtplib
+import socket
+import ssl
 from email.policy import default
 from email.message import EmailMessage
 from mcp.server.fastmcp import FastMCP
@@ -16,6 +18,16 @@ def _get_credentials() -> tuple[str | None, str | None]:
     app_password = os.environ.get("IMAP_APP_PASSWORD")
     return username, app_password
 
+
+def _get_network_timeout() -> float:
+    raw = os.environ.get("EMAIL_NETWORK_TIMEOUT_SEC", "12")
+    try:
+        value = float(raw)
+        return value if value > 0 else 12.0
+    except ValueError:
+        return 12.0
+
+
 @mcp.tool()
 def get_latest_emails(limit: int = 3) -> str:
     """Fetch the latest emails from the inbox using IMAP."""
@@ -26,7 +38,7 @@ def get_latest_emails(limit: int = 3) -> str:
 
     try:
         # Connect to Gmail IMAP
-        mail = imaplib.IMAP4_SSL('imap.gmail.com')
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", timeout=_get_network_timeout())
         mail.login(username, app_password)
         mail.select('inbox')
 
@@ -50,6 +62,8 @@ def get_latest_emails(limit: int = 3) -> str:
         mail.logout()
         return "\n".join(results) if results else "No emails found."
 
+    except (TimeoutError, socket.timeout):
+        return "IMAP connection failed: timed out."
     except Exception as e:
         return f"IMAP connection failed: {str(e)}"
 
@@ -66,7 +80,7 @@ def list_inbox_uids(limit: int = 20) -> str:
         return "Error: limit must be greater than 0."
 
     try:
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", timeout=_get_network_timeout())
         mail.login(username, app_password)
         mail.select("inbox")
 
@@ -81,6 +95,8 @@ def list_inbox_uids(limit: int = 20) -> str:
 
         mail.logout()
         return " ".join(uid.decode("utf-8") for uid in latest) if latest else "No emails found."
+    except (TimeoutError, socket.timeout):
+        return "IMAP UID listing failed: timed out."
     except Exception as e:
         return f"IMAP UID listing failed: {str(e)}"
 
@@ -97,6 +113,7 @@ def send_email(to: str, subject: str, body: str, cc: str = "") -> str:
         return "Error: recipient email cannot be empty."
 
     try:
+        timeout = _get_network_timeout()
         msg = EmailMessage()
         msg["From"] = username
         msg["To"] = to
@@ -105,11 +122,16 @@ def send_email(to: str, subject: str, body: str, cc: str = "") -> str:
         msg["Subject"] = subject
         msg.set_content(body)
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=timeout) as smtp:
+            smtp.ehlo()
+            smtp.starttls(context=ssl.create_default_context())
+            smtp.ehlo()
             smtp.login(username, app_password)
             smtp.send_message(msg)
 
         return f"Email sent to {to}" + (f" (cc: {cc})." if cc.strip() else ".")
+    except (TimeoutError, socket.timeout):
+        return "SMTP send failed: timed out."
     except Exception as e:
         return f"SMTP send failed: {str(e)}"
 
@@ -129,7 +151,7 @@ def archive_email(message_uid: str) -> str:
         return "Error: message_uid cannot be empty."
 
     try:
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", timeout=_get_network_timeout())
         mail.login(username, app_password)
         mail.select("inbox")
 
@@ -140,6 +162,8 @@ def archive_email(message_uid: str) -> str:
             return f"Archive failed for UID {message_uid}."
 
         return f"Archived email UID {message_uid}."
+    except (TimeoutError, socket.timeout):
+        return "IMAP archive failed: timed out."
     except Exception as e:
         return f"IMAP archive failed: {str(e)}"
 
