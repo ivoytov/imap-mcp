@@ -9,7 +9,7 @@ import base64
 from typing import Any
 from email.policy import default
 from email.message import EmailMessage
-from html_to_markdown import convert as convert_html_to_markdown
+from markdownify import markdownify as convert_html_to_markdown
 from mcp.server.fastmcp import FastMCP
 
 # Initialize the MCP server

@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "html-to-markdown>=3.4.0",
+    "markdownify>=1.2.2",
     "mcp>=1.27.0",
 ]
 
