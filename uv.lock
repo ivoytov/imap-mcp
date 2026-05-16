@@ -158,6 +158,12 @@ wheels = [
 ]
 
 [[package]]
+name = "html-to-markdown"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/30/a4aa8f9c9febf6096b0d14e3fa3559a8e100802fa81bd67deb8a8031c14d/html_to_markdown-3.4.0.tar.gz", hash = "sha256:3e7e0813cc871c7abe2d5ea927e9038374bea339e8dd72f3b4c2f1c0b8e51672", size = 283028, upload-time = "2026-05-09T11:07:49.784Z" }
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -208,11 +214,15 @@ name = "imap-mcp"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "html-to-markdown" },
     { name = "mcp" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "mcp", specifier = ">=1.27.0" }]
+requires-dist = [
+    { name = "html-to-markdown", specifier = ">=3.4.0" },
+    { name = "mcp", specifier = ">=1.27.0" },
+]
 
 [[package]]
 name = "jsonschema"
