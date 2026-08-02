@@ -10,10 +10,10 @@ from typing import Any
 from email.policy import default
 from email.message import EmailMessage
 from markdownify import markdownify as convert_html_to_markdown
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 # Initialize the MCP server
-mcp = FastMCP("IMAP Mail Reader")
+mcp = MCPServer("IMAP Mail Reader")
 
 
 def _get_credentials() -> tuple[str | None, str | None]:
